@@ -15,12 +15,15 @@ public class FlaskLabelEditor : Editor
     void OnEnable()
     {
         info = target as FlaskLabel;
-        toAdd = new List<Type>();
+        toAdd = new List<MonoScript>();
     }
 
-    Object selectedElixir;
-    Type selectedElixirType;
-    List<Type> toAdd;
+    MonoScript selectedElixir;
+
+    List<MonoScript> toAdd;
+
+    MonoScript toRemove;
+
     private bool notAnElixir;
     public override void OnInspectorGUI()
     {
@@ -39,13 +42,14 @@ public class FlaskLabelEditor : Editor
             return;
         }
 
-        Type toRemove = null;
-        foreach (Type type in info.Elixirs)
+        toRemove = null;
+        for (int i = 0; i < info.Elixirs.Length; i++)
         {
+            MonoScript type = info.Elixirs[i];
             if (type == null)
                 continue;
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(type.FullName);
+            EditorGUILayout.LabelField(info.elixirNames[i]);
             if (GUILayout.Button("X"))
             {
                 toRemove = type;
@@ -53,52 +57,41 @@ public class FlaskLabelEditor : Editor
             }
             EditorGUILayout.EndHorizontal();
         }
+
         EditorGUILayout.LabelField($"There are ({info.Elixirs.Length}) Elixirs total.");
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField($"Add an Elixir", EditorStyles.boldLabel);
         EditorGUILayout.BeginHorizontal();
 
-        Object newElixir = EditorGUILayout.ObjectField(selectedElixir, typeof(Object), true);
+        MonoScript newElixir = (MonoScript)EditorGUILayout.ObjectField(selectedElixir, typeof(MonoScript), true);
         if (selectedElixir != newElixir)
         {
             selectedElixir = newElixir;
             if (selectedElixir != null)
             {
-                Type elixirType = selectedElixir.GetType();
-
-                if (elixirType == typeof(MonoScript))
-                {
-                    MonoScript mono = (MonoScript)selectedElixir;
-                    Type monoClass = mono.GetClass();
-                    if (monoClass != null)
-                        elixirType = monoClass;
-                }
+                Type elixirType = selectedElixir.GetClass();
 
                 Elixir attribute = (Elixir)elixirType.GetCustomAttribute(typeof(Elixir));
                 if (attribute == null)
                 {
                     notAnElixir = true;
-                    selectedElixirType = null;
                 }
                 else
                 {
                     notAnElixir = false;
-                    selectedElixirType = elixirType;
                 }
             } else
             {
                 notAnElixir = false;
-                selectedElixirType = null;
             }
         }
 
         if (notAnElixir)
         {
             EditorGUILayout.LabelField("THIS IS NOT AN ELIXIR!");
-            selectedElixirType = null;
         } else if (selectedElixir != null && GUILayout.Button("Add"))
         {
-            toAdd.Add(selectedElixirType);
+            toAdd.Add(selectedElixir);
             selectedElixir = null;
         }
 
@@ -112,14 +105,14 @@ public class FlaskLabelEditor : Editor
 
         if (toRemove != null || toAdd.Count != 0)
         {
-            List<Type> types = new List<Type>();
+            List<MonoScript> types = new List<MonoScript>();
             types.AddRange(info.Elixirs);
             if (toRemove != null)
                 types.Remove(toRemove);
 
             if (toAdd.Count != 0)
             {
-                foreach (Type type in toAdd)
+                foreach (MonoScript type in toAdd)
                 {
                     if (!types.Contains(type))
                         types.Add(type);
@@ -141,6 +134,5 @@ public class FlaskLabelEditor : Editor
     {
         notAnElixir = false;
         selectedElixir = null;
-        selectedElixirType = null;
     }
 }

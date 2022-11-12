@@ -5,6 +5,7 @@ using Maranara.Marrow;
 
 namespace SLZ.MarrowEditor
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(Flask))]
     [CanEditMultipleObjects]
     public class FlaskEditor : CrateEditor
@@ -33,4 +34,5 @@ namespace SLZ.MarrowEditor
 
     [CustomPreview(typeof(Flask))]
     public class FlaskPreview : CratePreview { }
+#endif
 }

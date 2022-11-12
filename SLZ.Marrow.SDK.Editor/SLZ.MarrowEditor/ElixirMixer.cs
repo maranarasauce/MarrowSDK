@@ -1,21 +1,14 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SLZ.Marrow.Warehouse;
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Xml.Linq;
 using UnityEditor;
 using UnityEngine;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using Microsoft.Build.Unity;
-using Microsoft.CodeAnalysis;
 using SLZ.MarrowEditor;
 using SLZ.Marrow;
 using System.Text.RegularExpressions;
-using UnityEditor.Build;
-using System.Reflection;
+using UnityEditor.Compilation;
 
 namespace Maranara.Marrow
 {
@@ -52,6 +45,39 @@ namespace Maranara.Marrow
 
         public static bool ExportElixirs(string title, string outputDirectory, Flask flask)
         {
+            if (!ConfirmMelonDirectory())
+                return false;
+
+            List<string> exportedScriptPaths = new List<string>();
+
+            string tempDir = Path.Combine(Path.GetTempPath(), title);
+            Directory.CreateDirectory(tempDir);
+
+            FlaskLabel label = (FlaskLabel)flask.MainAsset.EditorAsset;
+            foreach (MonoScript type in label.Elixirs)
+            {
+                string path = AssetDatabase.GetAssetPath(type);
+                exportedScriptPaths.Add(path);
+                Debug.Log(path);
+            }
+
+            AssemblyBuilder asmBuilder = new AssemblyBuilder(Path.Combine(outputDirectory, title + ".dll"), exportedScriptPaths.ToArray());
+            Debug.Log(asmBuilder.assemblyPath);
+            asmBuilder.buildTarget = BuildTarget.StandaloneWindows64;
+            asmBuilder.buildTargetGroup = BuildTargetGroup.Standalone;
+            asmBuilder.buildFinished -= AsmBuilder_buildFinished;
+            asmBuilder.buildFinished += AsmBuilder_buildFinished;
+            return asmBuilder.Build();
+        }
+
+        private static void AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2)
+        {
+            Debug.Log("build finish");
+            //asmBuilder.buildFinished -= AsmBuilder_buildFinished;
+        }
+
+        private static bool ConfirmMelonDirectory()
+        {
             if (string.IsNullOrEmpty(ML_DIR))
             {
                 bool solved = false;
@@ -75,6 +101,13 @@ namespace Maranara.Marrow
                     return false;
                 }
             }
+            return true;
+        }
+
+        /*public static bool ExportElixirsOLD(string title, string outputDirectory, Flask flask)
+        {
+            ConfirmMelonDirectory();
+
             List<Type> exportedTypes = new List<Type>();
 
             string tempDir = Path.Combine(Path.GetTempPath(), title);
@@ -194,7 +227,7 @@ namespace Maranara.Marrow
                 throw e;
                 return false;
             }
-        }
+        }*/
     }
 
 }
