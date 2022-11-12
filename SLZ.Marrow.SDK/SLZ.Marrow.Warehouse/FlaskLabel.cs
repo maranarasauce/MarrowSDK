@@ -50,12 +50,15 @@ namespace SLZ.Marrow.Warehouse
 #endif
         public string[] elixirNames;
         public string[] elixirPaths;
+        public bool useDefaultIngredients = true;
+        public string[] ingredients;
+        public string[] additionalIngredients;
 #if UNITY_EDITOR
         [MenuItem("Stress Level Zero/Alchemy/Create Flask Label Based on Open Scenes")]
         public static void CreateFlaskInfo()
         {
             FlaskLabel asset = ScriptableObject.CreateInstance<FlaskLabel>();
-            
+            asset.useDefaultIngredients = true;
             asset.Elixirs = Elixir.GetAllElixirsFromScene();
             AssetDatabase.CreateAsset(asset, $"Assets/Flask Label {SceneManager.GetActiveScene().name}.asset");
             AssetDatabase.SaveAssets();

@@ -24,9 +24,9 @@ namespace SLZ.MarrowEditor
             {
                 Flask flask = (Flask)target;
 
-                bool stirred = ElixirMixer.ExportElixirs("StirTest", Application.temporaryCachePath, flask);
-                if (stirred)
-                    EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");
+                ElixirMixer.ExportElixirs("StirTest", Application.temporaryCachePath, flask);
+                /*if (stirred)
+                    EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");*/
             }
             //EditorGUILayout.PropertyField(flaskInfoProperty);
         }

@@ -17,7 +17,8 @@ namespace Maranara.Marrow
 {
     public static class ElixirMixer
     {
-        private static string ML_DIR = null;
+        public static string ML_DIR = null;
+        public static string ML_MANAGED_DIR = null;
         public static void ExportFlasks(Pallet pallet)
         {
             List<Flask> flasks = new List<Flask>();
@@ -46,6 +47,8 @@ namespace Maranara.Marrow
             }
         }
 
+        
+
         public static bool ExportElixirs(string title, string outputDirectory, Flask flask)
         {
             if (!ConfirmMelonDirectory())
@@ -65,40 +68,98 @@ namespace Maranara.Marrow
                 CreateTempElixir(newPath, type.text, type.GetClass());
 
                 exportedScriptPaths.Add(newPath);
-                Debug.Log($"{path}, {newPath}");
             }
 
             AssemblyBuilder asmBuilder = new AssemblyBuilder(Path.Combine(outputDirectory, title + ".dll"), exportedScriptPaths.ToArray());
-            Debug.Log(asmBuilder.assemblyPath);
+
             asmBuilder.buildTarget = BuildTarget.StandaloneWindows64;
             asmBuilder.buildTargetGroup = BuildTargetGroup.Standalone;
-            asmBuilder.buildFinished -= ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir));
-            asmBuilder.buildFinished += ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir));
+            asmBuilder.buildFinished -= ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir, title));
+            asmBuilder.buildFinished += ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir, title));
 
-            Debug.Log(asmBuilder.referencesOptions.ToString());
-
-            asmBuilder.referencesOptions = ReferencesOptions.None;
             asmBuilder.excludeReferences = asmBuilder.defaultReferences;
-            
+
+            List<string> references = new List<string>();
+
+            if (label.useDefaultIngredients)
+                references.AddRange(GetDefaultReferences(true));
+            else references.AddRange(AddPathToReferences(label.ingredients));
+
+            if (label.additionalIngredients != null)
+                references.AddRange(AddPathToReferences(label.additionalIngredients));
+
+            asmBuilder.additionalReferences = references.ToArray();
+            asmBuilder.compilerOptions = new ScriptCompilerOptions()
+            {
+                CodeOptimization = CodeOptimization.Release
+            };
+
+            return asmBuilder.Build();
+        }
+
+        #region ReferenceUtils
+        public static string[] GetDefaultReferences(bool withPath)
+        {
+            ConfirmMelonDirectory();
+
+            if (!withPath)
+            {
+                return GetDefaultReferencesNoPath();
+            }
+
             List<string> additionalReferences = new List<string>();
             additionalReferences.Add(Path.Combine(ML_DIR, "MelonLoader.dll"));
-            foreach (string reference in Directory.GetFiles(Path.Combine(ML_DIR, "Managed")))
+            additionalReferences.Add(Path.Combine(ML_DIR, "0Harmony.dll"));
+            foreach (string reference in Directory.GetFiles(ML_MANAGED_DIR))
             {
                 if (!reference.EndsWith(".dll"))
                     continue;
 
                 string fileName = Path.GetFileNameWithoutExtension(reference);
-                //Debug.Log(fileName);
+
                 if (!(fileName == "netstandard"))
                 {
                     additionalReferences.Add(reference);
                 }
             }
-
-            asmBuilder.additionalReferences = additionalReferences.ToArray();
-
-            return asmBuilder.Build();
+            return additionalReferences.ToArray();
         }
+
+        private static string[] GetDefaultReferencesNoPath()
+        {
+            List<string> additionalReferences = new List<string>();
+            additionalReferences.Add("..\\MelonLoader.dll");
+            additionalReferences.Add("..\\0Harmony.dll");
+            foreach (string reference in Directory.GetFiles(ML_MANAGED_DIR))
+            {
+                if (!reference.EndsWith(".dll"))
+                    continue;
+
+                string fileName = Path.GetFileNameWithoutExtension(reference);
+
+                if (!(fileName == "netstandard"))
+                {
+                    additionalReferences.Add(fileName);
+                }
+            }
+            return additionalReferences.ToArray();
+        }
+
+        private static string[] AddPathToReferences(string[] references)
+        {
+            for (int i = 0; i < references.Length; i++)
+            {
+                string path = references[i];
+                if (!File.Exists(path))
+                {
+                    string newPath = Path.Combine(ML_MANAGED_DIR, path); ;
+                    if (File.Exists(newPath))
+                        references[i] = newPath;
+                }
+            }
+            return references;
+        }
+        #endregion
 
         private static void CreateTempElixir(string path, string allText, Type elixirClass)
         {
@@ -147,9 +208,10 @@ namespace Maranara.Marrow
             }
         }
 
-        private static void AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2, string tempDir)
+        private static void AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2, string tempDir, string title)
         {
-            Debug.Log("Build Complete!");
+            bool hasErrors = false;
+
             foreach (CompilerMessage msg in arg2)
             {
                 switch (msg.type)
@@ -158,6 +220,7 @@ namespace Maranara.Marrow
                         Debug.Log(msg.message);
                         break;
                     case CompilerMessageType.Error:
+                        hasErrors = true;
                         Debug.LogError(msg.message);
                         break;
                     case CompilerMessageType.Warning:
@@ -167,6 +230,11 @@ namespace Maranara.Marrow
                 
             }
 
+            if (hasErrors)
+            {
+                EditorUtility.DisplayDialog($"Errors found in {title}", $"There was an Error detected while building {title}! Please check the Console.", "Okay");
+            }
+
             foreach (string file in Directory.GetFiles(tempDir))
             {
                 File.Delete(file);
@@ -174,7 +242,7 @@ namespace Maranara.Marrow
             Directory.Delete(tempDir);
         }
 
-        private static bool ConfirmMelonDirectory()
+        public static bool ConfirmMelonDirectory()
         {
             if (string.IsNullOrEmpty(ML_DIR))
             {
@@ -187,6 +255,7 @@ namespace Maranara.Marrow
                     {
                         string mlPath = File.ReadAllText(gamePathSS);
                         ML_DIR = mlPath.Replace("\n", "").Replace("\r", "");
+                        ML_MANAGED_DIR = Path.Combine(ML_DIR, "Managed");
                         solved = true;
                     }
                     else
@@ -201,131 +270,6 @@ namespace Maranara.Marrow
             }
             return true;
         }
-
-        /*public static bool ExportElixirsOLD(string title, string outputDirectory, Flask flask)
-        {
-            ConfirmMelonDirectory();
-
-            List<Type> exportedTypes = new List<Type>();
-
-            string tempDir = Path.Combine(Path.GetTempPath(), title);
-            Directory.CreateDirectory(tempDir);
-
-            // not very proud of this but hey if it works it works
-            string projTemplateDir = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "BehaviourProjectTemplate");
-
-            XDocument csproj = XDocument.Parse(File.ReadAllText(Path.Combine(projTemplateDir, "CustomMonoBehaviour.csproj")).Replace("$safeprojectname$", title).Replace("$BONELAB_DIR$", ML_DIR));
-            XElement compile = csproj.Root.Elements().Single((e) => e.ToString().Contains("Compile"));
-
-            var newScriptFile = File.ReadAllLines(Path.Combine(projTemplateDir, "CustomMonoBehaviour.cs")).ToList();
-            for (int i = 0; i < newScriptFile.Count; i++) newScriptFile[i] = newScriptFile[i].Replace("$safeprojectname$", title);
-            int lastIndex = newScriptFile.IndexOf(newScriptFile.Single((s) => s.Contains("newshithere")));
-
-            string[] scriptFiles = Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories);
-
-            FlaskLabel label = (FlaskLabel)flask.MainAsset.EditorAsset;
-            foreach (Type type in label.Elixirs)
-            {
-                if (exportedTypes.Contains(type))
-                {
-                    Debug.Log("Found duplicate script, skipping");
-                    continue;
-                }
-
-                Debug.Log("Searching for elixir of " + type.Name);
-                string scriptPath = scriptFiles.FirstOrDefault((f) => Path.GetFileNameWithoutExtension(f) == type.Name);
-                if (!string.IsNullOrEmpty(scriptPath))
-                {
-                    XElement newCompile = new XElement("Compile");
-                    newCompile.SetAttributeValue("Include", Path.GetFileName(scriptPath));
-                    compile.Add(newCompile);
-
-                    SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(File.ReadAllText(scriptPath));
-                    CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
-                    ClassDeclarationSyntax rootClass = null;
-
-                    // Add the IntPtr constructor for UnhollowerRuntimeLib
-                    bool inptrable = type.IsSubclassOf(typeof(MonoBehaviour)) || type.IsSubclassOf(typeof(ScriptableObject));
-
-                    DontAssignIntPtr dontAssignIntPtr = (DontAssignIntPtr)type.GetCustomAttribute(typeof(DontAssignIntPtr));
-                    if (dontAssignIntPtr != null)
-                        inptrable = false;
-
-                    if (inptrable)
-                    {
-                        ConstructorDeclarationSyntax ptrConstructor = SyntaxFactory.ConstructorDeclaration(type.Name).WithInitializer
-                        (
-                            ConstructorInitializer(SyntaxKind.BaseConstructorInitializer)
-                                .AddArgumentListArguments(Argument(IdentifierName("intPtr")))
-                        ).WithBody(Block());
-                        ptrConstructor = ptrConstructor.AddParameterListParameters(Parameter(List<AttributeListSyntax>(), TokenList(), ParseTypeName("System.IntPtr"), Identifier("intPtr"), null));
-                        ptrConstructor = ptrConstructor.AddModifiers(Token(SyntaxKind.PublicKeyword));
-                        ptrConstructor = ptrConstructor.NormalizeWhitespace();
-                        rootClass = MixerLibs.UpdateMainClass(root, type.Name);
-                        root = root.ReplaceNode(rootClass, rootClass.AddMembers(ptrConstructor));
-                    }
-
-                    // Remove all attributes using a rewriter class
-                    root = new MixerLibs.AttributeRemoverRewriter().Visit(root).SyntaxTree.GetCompilationUnitRoot();
-
-                    // Convert the final script to a string and switch UnityAction for System.Action
-                    string finalScript = root.NormalizeWhitespace().ToFullString();
-                    finalScript = finalScript.Replace("[Elixir]", "");
-                    finalScript = finalScript.Replace("[DontAssignIntPtr]", "");
-                    finalScript = finalScript.Replace("new UnityAction", "new System.Action");
-                    finalScript = finalScript.Replace("new UnityEngine.Events.UnityAction", "new System.Action");
-                    // Swap StartCoroutine for MelonCoroutines.Start
-                    finalScript = finalScript.Replace("this.StartCoroutine(", "MelonLoader.MelonCoroutines.Start(");
-                    finalScript = finalScript.Replace("base.StartCoroutine(", "MelonLoader.MelonCoroutines.Start(");
-                    finalScript = finalScript.Replace("StartCoroutine(", "MelonLoader.MelonCoroutines.Start(");
-
-                    File.WriteAllText(Path.Combine(tempDir, Path.GetFileName(scriptPath)), finalScript);
-                    //newScriptFile.Insert(lastIndex += 1, $"CustomMonoBehaviourHandler.RegisterMonoBehaviourInIl2Cpp<{type.Name}>();");
-
-                    exportedTypes.Add(type);
-                }
-                else
-                    Debug.LogError("FAILED TO FIND SCRIPT FOR " + type.Name + ". SKIPPING");
-            }
-
-            // xml stuff is weird so uh heres this
-            string finalCsproj = csproj.ToString().Replace("xmlns=\"\" ", "");
-            File.WriteAllText(Path.Combine(tempDir, "CustomMonoBehaviour.csproj"), finalCsproj);
-            File.WriteAllLines(Path.Combine(tempDir, "CustomMonoBehaviour.cs"), newScriptFile);
-            File.WriteAllText(Path.Combine(tempDir, "AssemblyInfo.cs"), File.ReadAllText(Path.Combine(projTemplateDir, "AssemblyInfo.cs")).Replace("$safeprojectname$", title));
-
-            MSBuildBuildProfile profile = MSBuildBuildProfile.Create("Debug", false, "-t:Build -p:Configuration=Debug");
-            List<MSBuildBuildProfile> profileList = new List<MSBuildBuildProfile>();
-            profileList.Add(profile);
-            IEnumerable<MSBuildBuildProfile> profiles = profileList;
-
-            MSBuildProjectReference project = MSBuildProjectReference.FromMSBuildProject(Path.Combine(tempDir, "CustomMonoBehaviour.csproj"), profiles: profiles);
-
-            try
-            {
-                project.BuildProject(profile.Name);
-
-                if (!Directory.Exists(outputDirectory))
-                    Directory.CreateDirectory(outputDirectory);
-
-                if (File.Exists(Path.Combine(outputDirectory, $"{title}.dll")))
-                    File.Delete(Path.Combine(outputDirectory, $"{title}.dll"));
-
-                File.Copy(Path.Combine(tempDir, "bin", "Debug", title + ".dll"), Path.Combine(outputDirectory, $"{title}.dll"));
-                Directory.Delete(tempDir, true);
-                return true;
-
-            }
-            catch (Exception e)
-            {
-                EditorUtility.DisplayDialog("ERROR", "Your compiled scripts had errors. Opening the output log...", "OK");
-                string msbuild = $"{System.IO.Directory.GetCurrentDirectory()}\\msbuild_out.txt";
-                Debug.Log(msbuild);
-                System.Diagnostics.Process.Start(msbuild);
-                throw e;
-                return false;
-            }
-        }*/
     }
 
 }
