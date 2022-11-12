@@ -88,7 +88,7 @@ namespace Maranara.Marrow
                     continue;
 
                 string fileName = Path.GetFileNameWithoutExtension(reference);
-                Debug.Log(fileName);
+                //Debug.Log(fileName);
                 if (!(fileName == "netstandard"))
                 {
                     additionalReferences.Add(reference);
@@ -152,14 +152,26 @@ namespace Maranara.Marrow
             Debug.Log("Build Complete!");
             foreach (CompilerMessage msg in arg2)
             {
-                Debug.Log(msg.message);
+                switch (msg.type)
+                {
+                    case CompilerMessageType.Info:
+                        Debug.Log(msg.message);
+                        break;
+                    case CompilerMessageType.Error:
+                        Debug.LogError(msg.message);
+                        break;
+                    case CompilerMessageType.Warning:
+                        Debug.LogWarning(msg.message);
+                        break;
+                }
+                
             }
+
             foreach (string file in Directory.GetFiles(tempDir))
             {
                 File.Delete(file);
             }
             Directory.Delete(tempDir);
-            //asmBuilder.buildFinished -= AsmBuilder_buildFinished;
         }
 
         private static bool ConfirmMelonDirectory()
