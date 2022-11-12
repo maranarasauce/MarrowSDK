@@ -9,6 +9,9 @@ using SLZ.MarrowEditor;
 using SLZ.Marrow;
 using System.Text.RegularExpressions;
 using UnityEditor.Compilation;
+using System;
+using Microsoft.CodeAnalysis;
+using System.Reflection;
 
 namespace Maranara.Marrow
 {
@@ -50,29 +53,112 @@ namespace Maranara.Marrow
 
             List<string> exportedScriptPaths = new List<string>();
 
-            string tempDir = Path.Combine(Path.GetTempPath(), title);
+            string tempDir = Path.Combine(Application.dataPath, $"{GUID.Generate()}-{title}");
             Directory.CreateDirectory(tempDir);
 
             FlaskLabel label = (FlaskLabel)flask.MainAsset.EditorAsset;
             foreach (MonoScript type in label.Elixirs)
             {
                 string path = AssetDatabase.GetAssetPath(type);
-                exportedScriptPaths.Add(path);
-                Debug.Log(path);
+                string newPath = Path.Combine(tempDir, Path.GetFileName(path));
+
+                CreateTempElixir(newPath, type.text, type.GetClass());
+
+                exportedScriptPaths.Add(newPath);
+                Debug.Log($"{path}, {newPath}");
             }
 
             AssemblyBuilder asmBuilder = new AssemblyBuilder(Path.Combine(outputDirectory, title + ".dll"), exportedScriptPaths.ToArray());
             Debug.Log(asmBuilder.assemblyPath);
             asmBuilder.buildTarget = BuildTarget.StandaloneWindows64;
             asmBuilder.buildTargetGroup = BuildTargetGroup.Standalone;
-            asmBuilder.buildFinished -= AsmBuilder_buildFinished;
-            asmBuilder.buildFinished += AsmBuilder_buildFinished;
+            asmBuilder.buildFinished -= ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir));
+            asmBuilder.buildFinished += ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir));
+
+            Debug.Log(asmBuilder.referencesOptions.ToString());
+
+            asmBuilder.referencesOptions = ReferencesOptions.None;
+            asmBuilder.excludeReferences = asmBuilder.defaultReferences;
+            
+            List<string> additionalReferences = new List<string>();
+            additionalReferences.Add(Path.Combine(ML_DIR, "MelonLoader.dll"));
+            foreach (string reference in Directory.GetFiles(Path.Combine(ML_DIR, "Managed")))
+            {
+                if (!reference.EndsWith(".dll"))
+                    continue;
+
+                string fileName = Path.GetFileNameWithoutExtension(reference);
+                Debug.Log(fileName);
+                if (!(fileName == "netstandard"))
+                {
+                    additionalReferences.Add(reference);
+                }
+            }
+
+            asmBuilder.additionalReferences = additionalReferences.ToArray();
+
             return asmBuilder.Build();
         }
 
-        private static void AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2)
+        private static void CreateTempElixir(string path, string allText, Type elixirClass)
         {
-            Debug.Log("build finish");
+            SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(allText);
+            CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
+            ClassDeclarationSyntax rootClass = null;
+
+            // Add the IntPtr constructor for UnhollowerRuntimeLib
+            bool inptrable = elixirClass.IsSubclassOf(typeof(MonoBehaviour)) || elixirClass.IsSubclassOf(typeof(ScriptableObject));
+
+            DontAssignIntPtr dontAssignIntPtr = (DontAssignIntPtr)elixirClass.GetCustomAttribute(typeof(DontAssignIntPtr));
+            if (dontAssignIntPtr != null)
+                inptrable = false;
+
+            if (inptrable)
+            {
+                ConstructorDeclarationSyntax ptrConstructor = SyntaxFactory.ConstructorDeclaration(elixirClass.Name).WithInitializer
+                (
+                    SyntaxFactory.ConstructorInitializer(SyntaxKind.BaseConstructorInitializer)
+                        .AddArgumentListArguments(SyntaxFactory.Argument(SyntaxFactory.IdentifierName("intPtr")))
+                ).WithBody(SyntaxFactory.Block());
+                ptrConstructor = ptrConstructor.AddParameterListParameters(SyntaxFactory.Parameter(SyntaxFactory.List<AttributeListSyntax>(), SyntaxFactory.TokenList(), SyntaxFactory.ParseTypeName("System.IntPtr"), SyntaxFactory.Identifier("intPtr"), null));
+                ptrConstructor = ptrConstructor.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
+                ptrConstructor = ptrConstructor.NormalizeWhitespace();
+                rootClass = MixerLibs.UpdateMainClass(root, elixirClass.Name);
+                root = root.ReplaceNode(rootClass, rootClass.AddMembers(ptrConstructor));
+            }
+
+            // Remove all attributes using a rewriter class
+            root = new MixerLibs.AttributeRemoverRewriter().Visit(root).SyntaxTree.GetCompilationUnitRoot();
+
+            // Convert the final script to a string and switch UnityAction for System.Action
+            string finalScript = root.NormalizeWhitespace().ToFullString();
+            finalScript = finalScript.Replace("[Elixir]", "");
+            finalScript = finalScript.Replace("[DontAssignIntPtr]", "");
+            finalScript = finalScript.Replace("new UnityAction", "new System.Action");
+            finalScript = finalScript.Replace("new UnityEngine.Events.UnityAction", "new System.Action");
+            // Swap StartCoroutine for MelonCoroutines.Start
+            finalScript = finalScript.Replace("this.StartCoroutine(", "MelonLoader.MelonCoroutines.Start(");
+            finalScript = finalScript.Replace("base.StartCoroutine(", "MelonLoader.MelonCoroutines.Start(");
+            finalScript = finalScript.Replace("StartCoroutine(", "MelonLoader.MelonCoroutines.Start(");
+
+            using (StreamWriter sw = File.CreateText(path))
+            {
+                sw.Write(finalScript);
+            }
+        }
+
+        private static void AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2, string tempDir)
+        {
+            Debug.Log("Build Complete!");
+            foreach (CompilerMessage msg in arg2)
+            {
+                Debug.Log(msg.message);
+            }
+            foreach (string file in Directory.GetFiles(tempDir))
+            {
+                File.Delete(file);
+            }
+            Directory.Delete(tempDir);
             //asmBuilder.buildFinished -= AsmBuilder_buildFinished;
         }
 
