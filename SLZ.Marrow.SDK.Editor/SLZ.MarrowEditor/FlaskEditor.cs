@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using SLZ.Marrow.Warehouse;
 using Maranara.Marrow;
+using UnityEngine.Events;
 
 namespace SLZ.MarrowEditor
 {
@@ -24,11 +25,23 @@ namespace SLZ.MarrowEditor
             {
                 Flask flask = (Flask)target;
 
-                ElixirMixer.ExportElixirs("StirTest", Application.temporaryCachePath, flask);
+                UnityEvent<bool> BuildEvent = new UnityEvent<bool>();
+                BuildEvent.AddListener(OnBuildComplete);
+
+                ElixirMixer.ExportElixirs("StirTest", Application.temporaryCachePath, flask, BuildEvent);
                 /*if (stirred)
-                    EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");*/
+                   */
             }
             //EditorGUILayout.PropertyField(flaskInfoProperty);
+        }
+
+        private static void OnBuildComplete(bool hasErrors)
+        {
+            if (hasErrors)
+            {
+                EditorUtility.DisplayDialog("Error", $"Errors detected in the Flask! Check the Console for errors.", "Fine");
+            }
+            else EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");
         }
     }
 

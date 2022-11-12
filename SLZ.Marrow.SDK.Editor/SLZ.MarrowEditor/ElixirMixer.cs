@@ -12,6 +12,8 @@ using UnityEditor.Compilation;
 using System;
 using Microsoft.CodeAnalysis;
 using System.Reflection;
+using UnityEngine.Events;
+using System.Threading.Tasks;
 
 namespace Maranara.Marrow
 {
@@ -37,22 +39,40 @@ namespace Maranara.Marrow
             if (!Directory.Exists(flaskPath))
                 Directory.CreateDirectory(flaskPath);
 
-            foreach (Flask flask in flasks)
-            {
-                string title = MarrowSDK.SanitizeName(flask.Title);
-                title = Regex.Replace(title, @"\s+", "");
-                bool success = ExportElixirs(title, flaskPath, flask);
-                if (!success)
-                    break;
-            }
+            IterateNextFlask(flaskPath, flasks.ToArray(), 0);
         }
 
-        
+        private static void IterateNextFlask(string flaskPath, Flask[] flasks, int i)
+        {
+            if (i > (flasks.Length - 1))
+            {
 
-        public static bool ExportElixirs(string title, string outputDirectory, Flask flask)
+                return;
+            }
+                
+
+            Flask flask = flasks[i];
+            Debug.Log(flask.Title);
+            string title = MarrowSDK.SanitizeName(flask.Title);
+            title = Regex.Replace(title, @"\s+", "");
+
+            UnityEvent<bool> completeCallback = new UnityEvent<bool>();
+            completeCallback.AddListener((hasErrors) =>
+            {
+                if (hasErrors)
+                {
+                    EditorUtility.DisplayDialog("Error", $"Errors detected in the {flask.Title} Flask! Check the Console for errors.", "Fine");
+                }
+                else IterateNextFlask(flaskPath, flasks, i + 1);
+            });
+
+            ExportElixirs(title, flaskPath, flask, completeCallback);
+        }
+
+        public static void ExportElixirs(string title, string outputDirectory, Flask flask, UnityEvent<bool> invokeAfterBuild)
         {
             if (!ConfirmMelonDirectory())
-                return false;
+                return;
 
             List<string> exportedScriptPaths = new List<string>();
 
@@ -74,8 +94,12 @@ namespace Maranara.Marrow
 
             asmBuilder.buildTarget = BuildTarget.StandaloneWindows64;
             asmBuilder.buildTargetGroup = BuildTargetGroup.Standalone;
-            asmBuilder.buildFinished -= ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir, title));
-            asmBuilder.buildFinished += ((arg1, arg2) => AsmBuilder_buildFinished(arg1, arg2, tempDir, title));
+
+            asmBuilder.buildFinished += ((arg1, arg2) =>
+            {
+                bool hasErrors = AsmBuilder_buildFinished(arg1, arg2, tempDir, title);
+                invokeAfterBuild?.Invoke(hasErrors);
+            });
 
             asmBuilder.excludeReferences = asmBuilder.defaultReferences;
 
@@ -94,7 +118,17 @@ namespace Maranara.Marrow
                 CodeOptimization = CodeOptimization.Release
             };
 
-            return asmBuilder.Build();
+            WaitForCompile(asmBuilder);
+        }
+
+        private async static void WaitForCompile(AssemblyBuilder builder)
+        {
+            while (EditorApplication.isCompiling)
+            {
+                await Task.Delay(1000);
+            }
+
+            builder.Build();
         }
 
         #region ReferenceUtils
@@ -152,7 +186,10 @@ namespace Maranara.Marrow
                 string path = references[i];
                 if (!File.Exists(path))
                 {
-                    string newPath = Path.Combine(ML_MANAGED_DIR, path); ;
+                    if (!path.EndsWith(".dll"))
+                        path = path + ".dll";
+                    string newPath = Path.Combine(ML_MANAGED_DIR, path);
+                    //Debug.Log(newPath);
                     if (File.Exists(newPath))
                         references[i] = newPath;
                 }
@@ -208,7 +245,7 @@ namespace Maranara.Marrow
             }
         }
 
-        private static void AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2, string tempDir, string title)
+        private static bool AsmBuilder_buildFinished(string arg1, CompilerMessage[] arg2, string tempDir, string title)
         {
             bool hasErrors = false;
 
@@ -240,6 +277,8 @@ namespace Maranara.Marrow
                 File.Delete(file);
             }
             Directory.Delete(tempDir);
+
+            return hasErrors;
         }
 
         public static bool ConfirmMelonDirectory()
