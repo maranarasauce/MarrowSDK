@@ -27,7 +27,8 @@ public class FlaskLabelEditor : Editor
     private MonoScript selectedElixir;
     private List<MonoScript> toAdd;
     private MonoScript toRemove;
-    private bool notAnElixir, ingredientsInfoFoldout, elixirInfoFoldout, elixirListFoldout;
+    private bool notAnElixir, ingredientsInfoFoldout, ingredientsFoldout, elixirInfoFoldout;
+    private bool elixirListFoldout = true;
 
     private SerializedProperty ingredientsProperty;
     private SerializedProperty ingredientsPlusProperty;
@@ -36,8 +37,11 @@ public class FlaskLabelEditor : Editor
         
         serializedObject.Update();
 
+        GUIStyle style = EditorStyles.foldout;
+        style.fontStyle = FontStyle.Bold;
+
         #region ElixirSelector
-        EditorGUILayout.LabelField("Elixirs", EditorStyles.boldLabel);
+
         if (info == null)
         {
             EditorGUILayout.LabelField("Info is null");
@@ -49,7 +53,13 @@ public class FlaskLabelEditor : Editor
             return;
         }
 
-        elixirInfoFoldout = EditorGUILayout.Foldout(elixirInfoFoldout, "Usage Info", true);
+        EditorGUILayout.BeginHorizontal();
+        elixirListFoldout = EditorGUILayout.Foldout(elixirListFoldout, "Elixirs", true, style);
+
+        if (GUILayout.Button("?"))
+            elixirInfoFoldout = !elixirInfoFoldout;
+        EditorGUILayout.EndHorizontal();
+
         if (elixirInfoFoldout)
         {
             EditorStyles.label.wordWrap = true;
@@ -59,14 +69,49 @@ public class FlaskLabelEditor : Editor
 
         toRemove = null;
 
-        GUIStyle style = EditorStyles.foldout;
-
-        style.fontStyle = FontStyle.Bold;
-        elixirListFoldout = EditorGUILayout.Foldout(elixirListFoldout, "Elixir List", true, style);
-        style.fontStyle = FontStyle.Normal;
-
         if (elixirListFoldout)
         {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Add an Elixir");
+
+            MonoScript newElixir = (MonoScript)EditorGUILayout.ObjectField(selectedElixir, typeof(MonoScript), true);
+            if (selectedElixir != newElixir)
+            {
+                selectedElixir = newElixir;
+                if (selectedElixir != null)
+                {
+                    Type elixirType = selectedElixir.GetClass();
+
+                    Elixir attribute = (Elixir)elixirType.GetCustomAttribute(typeof(Elixir));
+                    if (attribute == null)
+                        notAnElixir = true;
+                    else
+                        notAnElixir = false;
+                }
+                else
+                    notAnElixir = false;
+            }
+
+            if (notAnElixir)
+                EditorGUILayout.LabelField("THIS IS NOT AN ELIXIR!");
+            else if (selectedElixir != null && GUILayout.Button("Add"))
+            {
+                toAdd.Add(selectedElixir);
+                selectedElixir = null;
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Add All from Current Scene"))
+            {
+                toAdd.AddRange(Elixir.GetAllElixirsFromScene());
+                selectedElixir = null;
+            }
+
+            style = EditorStyles.boldLabel;
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField($"Elixir List ({info.Elixirs.Length})", style);
+
             for (int i = 0; i < info.Elixirs.Length; i++)
             {
                 MonoScript type = info.Elixirs[i];
@@ -81,52 +126,6 @@ public class FlaskLabelEditor : Editor
                 }
                 EditorGUILayout.EndHorizontal();
             }
-        }
-        
-
-        EditorGUILayout.Space(10);
-        EditorGUILayout.LabelField($"There are ({info.Elixirs.Length}) Elixirs total.");
-        EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField($"Add an Elixir");
-
-        MonoScript newElixir = (MonoScript)EditorGUILayout.ObjectField(selectedElixir, typeof(MonoScript), true);
-        if (selectedElixir != newElixir)
-        {
-            selectedElixir = newElixir;
-            if (selectedElixir != null)
-            {
-                Type elixirType = selectedElixir.GetClass();
-
-                Elixir attribute = (Elixir)elixirType.GetCustomAttribute(typeof(Elixir));
-                if (attribute == null)
-                {
-                    notAnElixir = true;
-                }
-                else
-                {
-                    notAnElixir = false;
-                }
-            } else
-            {
-                notAnElixir = false;
-            }
-        }
-
-        if (notAnElixir)
-        {
-            EditorGUILayout.LabelField("THIS IS NOT AN ELIXIR!");
-        } else if (selectedElixir != null && GUILayout.Button("Add"))
-        {
-            toAdd.Add(selectedElixir);
-            selectedElixir = null;
-        }
-
-        EditorGUILayout.EndHorizontal();
-
-        if (GUILayout.Button("Add All from Current Scene"))
-        {
-            toAdd.AddRange(Elixir.GetAllElixirsFromScene());
-            selectedElixir = null;
         }
 
         if (toRemove != null || toAdd.Count != 0)
@@ -155,10 +154,18 @@ public class FlaskLabelEditor : Editor
         #endregion
 
         GUILayout.Space(20);
-        #region ReferenceSelector
-        EditorGUILayout.LabelField("Ingredients", EditorStyles.boldLabel);
 
-        ingredientsInfoFoldout = EditorGUILayout.Foldout(ingredientsInfoFoldout, "Usage Info", true);
+        #region ReferenceSelector
+        style = EditorStyles.foldout;
+        style.fontStyle = FontStyle.Bold;
+
+        EditorGUILayout.BeginHorizontal();
+        ingredientsFoldout = EditorGUILayout.Foldout(ingredientsFoldout, "Ingredients", true, style);
+
+        if (GUILayout.Button("?"))
+            ingredientsInfoFoldout = !ingredientsInfoFoldout;
+        EditorGUILayout.EndHorizontal();
+
         if (ingredientsInfoFoldout)
         {
             EditorStyles.label.wordWrap = true;
@@ -166,53 +173,60 @@ public class FlaskLabelEditor : Editor
         }
         GUILayout.Space(10);
 
-        EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField("Use Default Ingredients");
-        bool defaultIngredients = EditorGUILayout.Toggle(info.useDefaultIngredients);
-        EditorGUILayout.EndHorizontal();
-
-        if (defaultIngredients != info.useDefaultIngredients)
+        if (ingredientsFoldout)
         {
-            info.useDefaultIngredients = defaultIngredients;
-            if (defaultIngredients)
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Use Default Ingredients");
+            bool defaultIngredients = EditorGUILayout.Toggle(info.useDefaultIngredients);
+            EditorGUILayout.EndHorizontal();
+
+            if (defaultIngredients != info.useDefaultIngredients)
             {
-                if (info.ingredients == null)
+                info.useDefaultIngredients = defaultIngredients;
+                if (defaultIngredients)
+                {
+                    if (info.ingredients == null)
+                    {
+                        info.ingredients = ElixirMixer.GetDefaultReferences(false);
+                    }
+                }
+            }
+            if (!defaultIngredients)
+            {
+                GUIContent content = new GUIContent()
+                {
+                    text = "Base Ingredients"
+                };
+                EditorGUILayout.PropertyField(ingredientsProperty, content);
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Set Base Ingredients to Default"))
                 {
                     info.ingredients = ElixirMixer.GetDefaultReferences(false);
                 }
-            }
-        }
-        if (!defaultIngredients)
-        {
-            GUIContent content = new GUIContent()
-            {
-                text = "Base Ingredients"
-            };
-            EditorGUILayout.PropertyField(ingredientsProperty, content);
+                if (GUILayout.Button("Clear Base Ingredients"))
+                {
+                    info.ingredients = new string[0];
+                }
+                if (GUILayout.Button("Select Base Ingredient"))
+                {
+                    SelectIngredient(ref info.ingredients);
+                }
+                EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Set Base Ingredients to Default"))
-            {
-                info.ingredients = ElixirMixer.GetDefaultReferences(false);
-            }
-            if (GUILayout.Button("Clear Base Ingredients"))
-            {
-                info.ingredients = new string[0];
-            }
-            if (GUILayout.Button("Select Base Ingredient"))
-            {
-                SelectIngredient(ref info.ingredients);
-            }
-            EditorGUILayout.EndHorizontal();
 
-            
+            }
+            if (defaultIngredients)
+            {
+                GUILayout.Space(10);
+                EditorGUILayout.PropertyField(ingredientsPlusProperty);
+                if (GUILayout.Button("Select Additional Ingredient"))
+                {
+                    SelectIngredient(ref info.additionalIngredients);
+                }
+            }
         }
-        GUILayout.Space(10);
-        EditorGUILayout.PropertyField(ingredientsPlusProperty);
-        if (GUILayout.Button("Select Additional Ingredient"))
-        {
-            SelectIngredient(ref info.additionalIngredients);
-        }
+        
         #endregion
 
         serializedObject.ApplyModifiedProperties();

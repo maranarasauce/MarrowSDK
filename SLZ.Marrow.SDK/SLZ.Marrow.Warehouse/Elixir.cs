@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -11,17 +12,19 @@ public class Elixir : Attribute
     public static MonoScript[] GetAllElixirsFromScene()
     {
         List<MonoScript> elixirs = new List<MonoScript>();
-        MonoScript[] mbs = Resources.FindObjectsOfTypeAll<MonoScript>();
-        foreach (MonoScript mb in mbs)
+        MonoBehaviour[] mbs = Resources.FindObjectsOfTypeAll<MonoBehaviour>();
+        for (int i = 0; i < mbs.Length; i++)
         {
+            MonoBehaviour mb = mbs[i];
             Type type = mb.GetType();
+
+            EditorUtility.DisplayProgressBar("Alchemy", $"Checking {type.Name}...", i / mbs.Length);
             Elixir attribute = (Elixir)type.GetCustomAttribute(typeof(Elixir));
             if (attribute == null)
                 continue;
-            else elixirs.Add(mb);
-
-            break;
+            else elixirs.Add(MonoScript.FromMonoBehaviour(mb));
         }
+        EditorUtility.ClearProgressBar();
         return elixirs.ToArray();
     }
 #endif
