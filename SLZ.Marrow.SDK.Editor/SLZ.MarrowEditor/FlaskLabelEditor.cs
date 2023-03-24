@@ -53,6 +53,16 @@ public class FlaskLabelEditor : Editor
             return;
         }
 
+        /*if (GUILayout.Button("[Debug] Load Elixir Cache from Names"))
+        {
+            info.LoadCacheFromNames();
+        }
+        if (GUILayout.Button("[Debug] Set Elixir Cache from Names"))
+        {
+            info.SetCacheToNames();
+        }*/
+
+
         EditorGUILayout.BeginHorizontal();
         elixirListFoldout = EditorGUILayout.Foldout(elixirListFoldout, "Elixirs", true, style);
 

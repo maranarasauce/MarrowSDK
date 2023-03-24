@@ -200,9 +200,11 @@ namespace Maranara.Marrow
 
         private static void CreateTempElixir(string path, string allText, Type elixirClass)
         {
+            allText = "#define FLASK_ONLY\n" + allText;
             SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(allText);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
             ClassDeclarationSyntax rootClass = null;
+
 
             // Add the IntPtr constructor for UnhollowerRuntimeLib
             bool inptrable = elixirClass.IsSubclassOf(typeof(MonoBehaviour)) || elixirClass.IsSubclassOf(typeof(ScriptableObject));
