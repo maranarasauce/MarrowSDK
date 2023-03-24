@@ -76,7 +76,7 @@ namespace Maranara.Marrow
 
             List<string> exportedScriptPaths = new List<string>();
 
-            string tempDir = Path.Combine(Application.dataPath, $"{GUID.Generate()}-{title}");
+            string tempDir = Path.Combine(Application.dataPath, $".{GUID.Generate()}-{title}");
             Directory.CreateDirectory(tempDir);
 
             FlaskLabel label = (FlaskLabel)flask.MainAsset.EditorAsset;
@@ -267,16 +267,25 @@ namespace Maranara.Marrow
                 
             }
 
+            bool deleteTempFiles = true;
             if (hasErrors)
             {
-                EditorUtility.DisplayDialog($"Errors found in {title}", $"There was an Error detected while building {title}! Please check the Console.", "Okay");
+                if (EditorUtility.DisplayDialog("Error", $"Errors detected in the Flask! Check the Console for errors.", "View generated scripts", "Done"))
+                {
+                    deleteTempFiles = false;
+                    EditorUtility.RevealInFinder(tempDir);
+                } 
             }
 
-            foreach (string file in Directory.GetFiles(tempDir))
+            if (deleteTempFiles)
             {
-                File.Delete(file);
+                foreach (string file in Directory.GetFiles(tempDir))
+                {
+                    File.Delete(file);
+                }
+                Directory.Delete(tempDir);
             }
-            Directory.Delete(tempDir);
+            
 
             return hasErrors;
         }

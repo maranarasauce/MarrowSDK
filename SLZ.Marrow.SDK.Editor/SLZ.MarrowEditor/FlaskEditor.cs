@@ -39,7 +39,10 @@ namespace SLZ.MarrowEditor
         {
             if (hasErrors)
             {
-                EditorUtility.DisplayDialog("Error", $"Errors detected in the Flask! Check the Console for errors.", "Fine");
+                /*if (EditorUtility.DisplayDialog("Error", $"Errors detected in the Flask! Check the Console for errors.", "View generated scripts", "Done"))
+                {
+
+                }*/
             }
             else EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");
         }
