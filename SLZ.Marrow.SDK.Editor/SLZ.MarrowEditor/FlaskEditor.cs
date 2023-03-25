@@ -22,6 +22,16 @@ namespace SLZ.MarrowEditor
         public override void OnInspectorGUIBody()
         {
             base.OnInspectorGUIBody();
+            if (GUILayout.Button("Pour Flasks in Pallet"))
+            {
+                Flask flask = (Flask)target;
+
+                ElixirMixer.ExportFlasks(flask.Pallet);
+
+                string palletPath = Path.GetFullPath(ModBuilder.BuildPath);
+                string flaskPath = Path.Combine(palletPath, "flasks");
+                EditorUtility.RevealInFinder(flaskPath);
+            }
             if (GUILayout.Button("Stir Flask"))
             {
                 Flask flask = (Flask)target;

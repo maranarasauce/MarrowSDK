@@ -1,4 +1,4 @@
-using UnityEngine;
+  using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using System.Collections.Generic;
@@ -65,6 +65,10 @@ namespace SLZ.MarrowEditor
                 if (AssetWarehouse.Instance == null)
                 {
                     EditorGUILayout.HelpBox("AssetWarehouse is NULL!", MessageType.Error);
+                    if (!Application.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode)
+                    {
+                        new AssetWarehouse();
+                    }
                 }
                 else
                 {
