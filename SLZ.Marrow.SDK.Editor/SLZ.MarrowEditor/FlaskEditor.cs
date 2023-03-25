@@ -3,6 +3,7 @@ using UnityEditor;
 using SLZ.Marrow.Warehouse;
 using Maranara.Marrow;
 using UnityEngine.Events;
+using System.IO;
 
 namespace SLZ.MarrowEditor
 {
@@ -25,10 +26,17 @@ namespace SLZ.MarrowEditor
             {
                 Flask flask = (Flask)target;
 
+                string title = "StirTest";
+                string buildPath = Application.temporaryCachePath;
+
                 UnityEvent<bool> BuildEvent = new UnityEvent<bool>();
+                BuildEvent.AddListener((hasErrors) =>
+                {
+                    ElixirMixer.TreatExportedElixir(Path.Combine(buildPath, title + ".dll"));
+                });
                 BuildEvent.AddListener(OnBuildComplete);
 
-                ElixirMixer.ExportElixirs("StirTest", Application.temporaryCachePath, flask, BuildEvent);
+                ElixirMixer.ExportElixirs("StirTest", buildPath, flask, BuildEvent);
                 /*if (stirred)
                    */
             }
@@ -45,6 +53,11 @@ namespace SLZ.MarrowEditor
                 }*/
             }
             else EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");
+
+            if (EditorUtility.DisplayDialog("Okay", "[DEBUG] Open the folder .dll please", "OK"))
+            {
+                EditorUtility.RevealInFinder(Path.Combine(Application.temporaryCachePath, "StirTest.dll"));
+            }
         }
     }
 

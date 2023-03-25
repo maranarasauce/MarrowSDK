@@ -1,29 +1,91 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Mono.Cecil;
+using Mono.Cecil.Cil;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using UnityEngine;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Maranara.Marrow
 {
     public static class MixerLibs
     {
+        private static MethodReference GetPtrConstructor(TypeDefinition type, ModuleDefinition rootModule)
+        {
+            foreach (var method in type.Methods)
+            {
+                if (method.Name == ".ctor" && method.Parameters.Count == 1 && method.Parameters[0].ParameterType.FullName == "System.IntPtr")
+                {
+                    return rootModule.ImportReference(method);
+                }
+            }
+
+            return null;
+        }
+        public static bool CheckParentType(TypeDefinition type)
+        {
+            if (type.FullName == "UnityEngine.MonoBehaviour")
+            {
+                return true;
+            }
+
+            if (type.BaseType == null)
+            {
+                return false;
+            }
+
+            var res = type.BaseType.Resolve();
+            if (res == null)
+            {
+                return false;
+            }
+
+            return CheckParentType(res);
+        }
+        public static MethodReference GetOrAddPtrConstructorWithinAssembly(TypeDefinition type, ModuleDefinition rootModule, bool hasLeft = false)
+        {
+            var reference = GetPtrConstructor(type, rootModule);
+            if (reference != null)
+            {
+                return reference;
+            }
+
+            if (hasLeft)
+            {
+                return null;
+            }
+
+            var baseType = type.BaseType.Resolve();
+            var baseConstructor = GetOrAddPtrConstructorWithinAssembly(baseType, rootModule, hasLeft: type.Scope.Name != baseType.Scope.Name);
+
+            var methodAttributes = MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName;
+            var method = new MethodDefinition(".ctor", methodAttributes, type.Module.TypeSystem.Void);
+            method.Parameters.Add(new ParameterDefinition("ptr", ParameterAttributes.None, type.Module.TypeSystem.IntPtr));
+            method.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
+            method.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_1));
+            method.Body.Instructions.Add(Instruction.Create(OpCodes.Call, baseConstructor));
+            method.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+            type.Methods.Add(method);
+
+            return method;
+        }
+
         public static ClassDeclarationSyntax UpdateMainClass(CompilationUnitSyntax root, string @class)
         {
             return (ClassDeclarationSyntax)(root
-    .ChildNodes().First().ChildNodes()
-    .FirstOrDefault((c)
-    => c.GetType() == typeof(ClassDeclarationSyntax)
-    && ((ClassDeclarationSyntax)c).Identifier.ToString() == @class
-    ) ?? root
-    .ChildNodes()
-    .FirstOrDefault((c)
-    => c.GetType() == typeof(ClassDeclarationSyntax)
-    && ((ClassDeclarationSyntax)c).Identifier.ToString() == @class
-    ));
-
+            .ChildNodes().First().ChildNodes()
+            .FirstOrDefault((c)
+            => c.GetType() == typeof(ClassDeclarationSyntax)
+            && ((ClassDeclarationSyntax)c).Identifier.ToString() == @class
+            ) ?? root
+            .ChildNodes()
+            .FirstOrDefault((c)
+            => c.GetType() == typeof(ClassDeclarationSyntax)
+            && ((ClassDeclarationSyntax)c).Identifier.ToString() == @class
+            ));
         }
 
         // https://stackoverflow.com/a/37743242

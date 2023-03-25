@@ -14,6 +14,8 @@ using Microsoft.CodeAnalysis;
 using System.Reflection;
 using UnityEngine.Events;
 using System.Threading.Tasks;
+using Mono.Cecil;
+using UnityEditor.Build.Reporting;
 
 namespace Maranara.Marrow
 {
@@ -49,7 +51,7 @@ namespace Maranara.Marrow
 
                 return;
             }
-                
+
 
             Flask flask = flasks[i];
             Debug.Log(flask.Title);
@@ -59,6 +61,7 @@ namespace Maranara.Marrow
             UnityEvent<bool> completeCallback = new UnityEvent<bool>();
             completeCallback.AddListener((hasErrors) =>
             {
+                TreatExportedElixir(Path.Combine(flaskPath, title + ".dll"));
                 if (hasErrors)
                 {
                     EditorUtility.DisplayDialog("Error", $"Errors detected in the {flask.Title} Flask! Check the Console for errors.", "Fine");
@@ -67,6 +70,39 @@ namespace Maranara.Marrow
             });
 
             ExportElixirs(title, flaskPath, flask, completeCallback);
+        }
+
+        //Thanks WNP!
+        public static void TreatExportedElixir(string path)
+        {
+            var assemblyResolve = new DefaultAssemblyResolver();
+            var directories = assemblyResolve.GetSearchDirectories();
+            for (int i = 0; i < directories.Length; i++)
+            {
+                assemblyResolve.RemoveSearchDirectory(directories[i]);
+            }
+
+            assemblyResolve.AddSearchDirectory(Path.GetFullPath(ML_MANAGED_DIR));
+            //assemblyResolve.AddSearchDirectory(Path.GetFullPath(Path.Combine(Application.dataPath, "..\\ScriptReferences")));
+
+            using (var module = ModuleDefinition.ReadModule(path, new ReaderParameters() { AssemblyResolver = assemblyResolve }))
+            {
+                List<TypeDefinition> addDeserialize = new List<TypeDefinition>();
+                //var deserialiser = module.ImportReference(mtinm.Modules[0].Types.First(t => t.FullName == "ModThatIsNotMod.MonoBehaviours.CustomMonoBehaviourHandler").Methods.First(m => m.Name == "SetFieldValues"));
+
+                foreach (TypeDefinition typeDef in module.Types)
+                {
+                    if (MixerLibs.CheckParentType(typeDef))
+                    {
+                        var success = MixerLibs.GetOrAddPtrConstructorWithinAssembly(typeDef, module) != null;
+                        //Debug.Log(success ? $"Added IntPtr contstructor to type: {typeDef.FullName}" : $"Failed to add IntPtr constructor to type: {typeDef.FullName}");
+                    }
+                }
+
+                module.Write(path + ".temp");
+                File.Delete(path);
+                File.Move(path + ".temp", path);
+            }
         }
 
         public static void ExportElixirs(string title, string outputDirectory, Flask flask, UnityEvent<bool> invokeAfterBuild)
@@ -204,28 +240,6 @@ namespace Maranara.Marrow
             SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(allText);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
             ClassDeclarationSyntax rootClass = null;
-
-
-            // Add the IntPtr constructor for UnhollowerRuntimeLib
-            bool inptrable = elixirClass.IsSubclassOf(typeof(MonoBehaviour)) || elixirClass.IsSubclassOf(typeof(ScriptableObject));
-
-            DontAssignIntPtr dontAssignIntPtr = (DontAssignIntPtr)elixirClass.GetCustomAttribute(typeof(DontAssignIntPtr));
-            if (dontAssignIntPtr != null)
-                inptrable = false;
-
-            if (inptrable)
-            {
-                ConstructorDeclarationSyntax ptrConstructor = SyntaxFactory.ConstructorDeclaration(elixirClass.Name).WithInitializer
-                (
-                    SyntaxFactory.ConstructorInitializer(SyntaxKind.BaseConstructorInitializer)
-                        .AddArgumentListArguments(SyntaxFactory.Argument(SyntaxFactory.IdentifierName("intPtr")))
-                ).WithBody(SyntaxFactory.Block());
-                ptrConstructor = ptrConstructor.AddParameterListParameters(SyntaxFactory.Parameter(SyntaxFactory.List<AttributeListSyntax>(), SyntaxFactory.TokenList(), SyntaxFactory.ParseTypeName("System.IntPtr"), SyntaxFactory.Identifier("intPtr"), null));
-                ptrConstructor = ptrConstructor.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
-                ptrConstructor = ptrConstructor.NormalizeWhitespace();
-                rootClass = MixerLibs.UpdateMainClass(root, elixirClass.Name);
-                root = root.ReplaceNode(rootClass, rootClass.AddMembers(ptrConstructor));
-            }
 
             // Remove all attributes using a rewriter class
             root = new MixerLibs.AttributeRemoverRewriter().Visit(root).SyntaxTree.GetCompilationUnitRoot();
