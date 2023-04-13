@@ -128,7 +128,7 @@ public class FlaskLabelEditor : Editor
                 if (type == null)
                     continue;
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(info.elixirNames[i]);
+                EditorGUILayout.LabelField(AssetDatabase.GUIDToAssetPath(info.elixirGUIDs[i]));
                 if (GUILayout.Button("X"))
                 {
                     toRemove = type;
@@ -264,6 +264,14 @@ public class FlaskLabelEditor : Editor
         if (string.IsNullOrEmpty(GotPath))
             return string.Empty;
 
+        //Check if this is a Flask reference and return accordingly
+        DirectoryInfo parent = Directory.GetParent(GotPath);
+        if (parent.Name == "flasks")
+        {
+            string crateName = parent.Parent.Name;
+            string flaskName = Path.GetFileName(GotPath);
+            return $"Pallet-{crateName}-{flaskName}";
+        }
         return Path.GetRelativePath(ElixirMixer.ML_MANAGED_DIR, GotPath);
     }
 

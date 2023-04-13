@@ -112,7 +112,7 @@ namespace Maranara.Marrow
 
             List<string> exportedScriptPaths = new List<string>();
 
-            string tempDir = Path.Combine(Application.dataPath, $".{GUID.Generate()}-{title}");
+            string tempDir = Path.Combine(Application.dataPath, $".FLASK_GEN_{GUID.Generate()}-{title}");
             Directory.CreateDirectory(tempDir);
 
             FlaskLabel label = (FlaskLabel)flask.MainAsset.EditorAsset;
@@ -180,6 +180,7 @@ namespace Maranara.Marrow
             List<string> additionalReferences = new List<string>();
             additionalReferences.Add(Path.Combine(ML_DIR, "MelonLoader.dll"));
             additionalReferences.Add(Path.Combine(ML_DIR, "0Harmony.dll"));
+
             foreach (string reference in Directory.GetFiles(ML_MANAGED_DIR))
             {
                 if (!reference.EndsWith(".dll"))
@@ -222,10 +223,33 @@ namespace Maranara.Marrow
                 string path = references[i];
                 if (!File.Exists(path))
                 {
+                    //If path is relative, add on the ML path.
+
                     if (!path.EndsWith(".dll"))
                         path = path + ".dll";
+
                     string newPath = Path.Combine(ML_MANAGED_DIR, path);
-                    //Debug.Log(newPath);
+
+                    //Check if this is a flask reference
+                    if (path.StartsWith("Pallet-"))
+                    {
+                        path = path.Remove(0, 7);
+
+                        string[] splitPath = path.Split('-', StringSplitOptions.None);
+
+                        string crateName = Path.Combine(splitPath[0], "flasks");
+                        string flaskName = splitPath[1];
+
+                        string slzLocalLow = Path.Combine(Directory.GetParent(Application.persistentDataPath).Parent.FullName, "Stress Level Zero");
+
+                        //TODO
+                        //Currently, game name is hardcoded since there is no way to tell which game is to be selected. Hope this is fixed in an SDK patch.
+                        string gameLocalPath = Path.Combine(slzLocalLow, MarrowSDK.GAME_NAMES[0]);
+                        string modPath = Path.Combine(gameLocalPath, "Mods");
+
+                        newPath = Path.Combine(modPath, Path.Combine(crateName, flaskName));
+                    }
+
                     if (File.Exists(newPath))
                         references[i] = newPath;
                 }

@@ -22,17 +22,9 @@ namespace SLZ.MarrowEditor
         public override void OnInspectorGUIBody()
         {
             base.OnInspectorGUIBody();
-            if (GUILayout.Button("Pour Flasks in Pallet"))
-            {
-                Flask flask = (Flask)target;
 
-                ElixirMixer.ExportFlasks(flask.Pallet);
-
-                string palletPath = Path.GetFullPath(ModBuilder.BuildPath);
-                string flaskPath = Path.Combine(palletPath, "flasks");
-                EditorUtility.RevealInFinder(flaskPath);
-            }
-            if (GUILayout.Button("Stir Flask"))
+            GUILayout.Space(20);
+            if (GUILayout.Button("Stir Flasks"))
             {
                 Flask flask = (Flask)target;
 
@@ -47,24 +39,30 @@ namespace SLZ.MarrowEditor
                 BuildEvent.AddListener(OnBuildComplete);
 
                 ElixirMixer.ExportElixirs("StirTest", buildPath, flask, BuildEvent);
-                /*if (stirred)
-                   */
             }
-            //EditorGUILayout.PropertyField(flaskInfoProperty);
+            GUILayout.Space(5);
+            if (GUILayout.Button("Stir Flasks into Pallet"))
+            {
+                Flask flask = (Flask)target;
+
+                ElixirMixer.ExportFlasks(flask.Pallet);
+
+                string palletPath = Path.GetFullPath(ModBuilder.BuildPath);
+                string flaskPath = Path.Combine(palletPath, "flasks");
+                EditorUtility.RevealInFinder(flaskPath);
+            }
+            GUILayout.Space(20);
         }
 
         private static void OnBuildComplete(bool hasErrors)
         {
             if (hasErrors)
             {
-                /*if (EditorUtility.DisplayDialog("Error", $"Errors detected in the Flask! Check the Console for errors.", "View generated scripts", "Done"))
-                {
-
-                }*/
+                
             }
             else EditorUtility.DisplayDialog("Yay", "Stirred successfully with no anomalies!", "Drink the grog");
 
-            if (EditorUtility.DisplayDialog("Okay", "[DEBUG] Open the folder .dll please", "OK"))
+            if (EditorUtility.DisplayDialog("Flask stirring complete.", "Would you like to open the compiled folder?", "Yes"))
             {
                 EditorUtility.RevealInFinder(Path.Combine(Application.temporaryCachePath, "StirTest.dll"));
             }

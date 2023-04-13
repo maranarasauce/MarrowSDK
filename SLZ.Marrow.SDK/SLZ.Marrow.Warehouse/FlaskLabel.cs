@@ -1,9 +1,6 @@
 using UnityEngine;
-using System;
-using System.Reflection;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
-using static Google.Protobuf.WellKnownTypes.Field;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -15,9 +12,9 @@ namespace SLZ.Marrow.Warehouse
 #if UNITY_EDITOR
         public MonoScript[] Elixirs {
             get {
-                if (_elixirCache == null || _elixirCache.Length == 0 && elixirNames.Length != 0)
+                if (_elixirCache == null || _elixirCache.Length == 0 && elixirGUIDs.Length != 0)
                 {
-                    if (elixirNames != null)
+                    if (elixirGUIDs != null)
                     {
                         SetCacheToNames();
                     }
@@ -38,9 +35,9 @@ namespace SLZ.Marrow.Warehouse
                     if (mscript == null)
                         continue;
 
-                    fullNames.Add(AssetDatabase.GetAssetPath(mscript));
+                    fullNames.Add(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(mscript)));
                 }
-                elixirNames = fullNames.ToArray();
+                elixirGUIDs = fullNames.ToArray();
             }
         }
 
@@ -48,9 +45,9 @@ namespace SLZ.Marrow.Warehouse
         {
             List<MonoScript> types = new List<MonoScript>();
 
-            foreach (string typeName in elixirNames)
+            foreach (string typeName in elixirGUIDs)
             {
-                MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(typeName);
+                MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(AssetDatabase.GUIDToAssetPath(typeName));
                 if (script == null)
                 {
                     Debug.Log($"{typeName} could not be found");
@@ -71,8 +68,7 @@ namespace SLZ.Marrow.Warehouse
 
         private MonoScript[] _elixirCache;
 #endif
-        public string[] elixirNames;
-        public string[] elixirPaths;
+        public string[] elixirGUIDs;
         public bool useDefaultIngredients = true;
         public string[] ingredients;
         public string[] additionalIngredients;
