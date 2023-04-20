@@ -18,7 +18,7 @@ namespace SLZ.MarrowEditor
             parentProperty = default;
 
 
-            if (propertyPaths.Length > 1 && propertyPaths[^2] == "Array")
+            if (propertyPaths.Length > 1 && propertyPaths[propertyPaths.Length-1] == "Array")
             {
                 var arrayPath = string.Join('.', propertyPaths.SkipLast(1));
                 var arrayProp = serializedProperty.serializedObject.FindProperty(arrayPath);
