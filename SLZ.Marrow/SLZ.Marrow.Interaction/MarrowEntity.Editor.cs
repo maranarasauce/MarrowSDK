@@ -162,8 +162,8 @@ namespace SLZ.Marrow.Interaction
 
         public void Editor_AddCollider(Collider col)
         {
-            Array.Resize(ref _staticColliders, _staticColliders.Length + 1);
-            _staticColliders[^1] = col;
+            //Array.Resize(ref _staticColliders, _staticColliders.Length + 1);
+            //_staticColliders[^1] = col;
         }
 #endif
     }
