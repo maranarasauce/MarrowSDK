@@ -91,7 +91,7 @@ namespace SLZ.Marrow.Interaction
         public void Editor_AddCollider(Collider col)
         {
             Array.Resize(ref _colliders, _colliders.Length + 1);
-            _colliders[_colliders.Length - 1] = col;
+            _colliders[^1] = col;
         }
 
         public void Editor_SetRigidbody(Rigidbody rb, bool read)
